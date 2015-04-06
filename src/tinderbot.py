@@ -5,7 +5,7 @@ import os
 import urllib
 
 
-BOT_NAME = "Cupid"
+BOT_NAME = "TinderBot"
 HEADERS = {
 	"app_version"  : "4",
 	"content-type" : "application/json",
@@ -13,15 +13,15 @@ HEADERS = {
 	"user-agent"   : "Tinder/4.0.9 (iPhone; iOS 8.1.1; Scale/2.00)",
 }
 HOST = "https://api.gotinder.com"
-STORE_BASE_PATH = "{0}/cupidStore".format( os.environ["HOME"] )
+STORE_BASE_PATH = "{0}/tinderStore".format( os.environ["HOME"] )
 TIME_FORMAT = "%H:%M:%S"
 
 
-class CupidException( Exception ):
+class TinderBotException( Exception ):
 	pass
 
 
-class Cupid( object ):
+class TinderBot( object ):
 	def __init__( self ):
 		self.__headers = HEADERS
 		self.__userId = 0
@@ -42,7 +42,7 @@ class Cupid( object ):
 				self.__recommendations[recommendation["_id"]] = recommendation
 				msg = "{0}'s profile loaded.".format( recommendation["name"] )
 				self.__printMsg( msg )
-		self.__printMsg( "{0} recommendations loaded".format(
+		self.__printMsg( "{0} recommendations loaded.".format(
 			len( self.__recommendations ) ) )
 
 	def getRecommendations( self ):
@@ -128,22 +128,23 @@ class Cupid( object ):
 
 	def __updateRecommendation( self, recommendation ):
 		id_ = recommendation["_id"]
+		name = recommendation["name"]
 		if id_ in self.__recommendations:
 			savedPingTime = self.__getPingTime( self.__recommendations[id_] )
 			newPingTime = self.__getPingTime( recommendation )
 			if newPingTime > savedPingTime:
-				self.__printMsg( "Updating {0} in the store:".format( recommendation["name"] ) )
+				self.__printMsg( "Updating {0} in the store:".format( name ) )
 				self.__saveRecommendation( recommendation )
 				self.__recommendations[id_] = recommendation
-				self.__printMsg( "{0} updated.".format( recommendation["name"] ) )
+				self.__printMsg( "{0} updated.".format( name ) )
 			else:
-				msg = "{0} is up to date in the store.".format( recommendation["name"] )
+				msg = "{0} is up to date in the store.".format( name )
 				self.__printMsg( msg )
 		else:
-			self.__printMsg( "Adding {0} to the store:".format( recommendation["name"] ) )
+			self.__printMsg( "Adding {0} to the store:".format( name ) )
 			self.__saveRecommendation( recommendation )
 			self.__recommendations[id_] = recommendation
-			self.__printMsg( "{0} added.".format( recommendation["name"] ) )
+			self.__printMsg( "{0} added.".format( name ) )
 				
 	def requestRecommendations( self ):
 		self.__printMsg( "Requesting recommendations ..." )
@@ -152,7 +153,7 @@ class Cupid( object ):
 		if response.status_code != 200:
 			msg = "{0}: Error in request: {1}".format( BOTNAME,
 				response.status_code )
-			raise CupidException( msg )
+			raise TinderBotException( msg )
 		recommendations = response.json()["results"]
 		self.__printMsg( "{0} recommendations:".format(
 			len( recommendations ) ) )
@@ -168,11 +169,10 @@ class Cupid( object ):
 		if response.status_code != 200:
 			msg = "{0}: Error in request: {1}".format( BOTNAME,
 				response.status_code )
-			raise CupidException( msg )
+			raise TinderBotException( msg )
 		responseDict = response.json()
 		self.__matches = responseDict["matches"]
 		self.__blocks = reponseDict["blocks"]
-		
 
 	def likeRecommendations( self ):
 		pass
