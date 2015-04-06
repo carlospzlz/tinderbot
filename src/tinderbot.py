@@ -23,6 +23,7 @@ import requests
 import datetime
 import os
 import urllib
+import signal
 import sys
 
 
@@ -52,6 +53,8 @@ class TinderBot( object ):
 		self.__matchedPeople = {}
 		self.__blocks = {}
 		self.__remainingLikes = sys.maxsize
+		self.__cancelling = False
+		signal.signal( signal.SIGINT, self.__signalHandler )
 
 	def getPeople( self ):
 		return self.__people
@@ -61,6 +64,10 @@ class TinderBot( object ):
 
 	def getMatchedPeople( self ):
 		return self.__matchedPeople
+
+	def __signalHandler( self, signal, frame):
+		self.__cancelling = True
+		self.__printMsg( "Cancelling ..." )
 
 	def __printMsg( self, msg ):
 		time = datetime.datetime.now().strftime( TIME_FORMAT )
@@ -92,6 +99,9 @@ class TinderBot( object ):
 			return
 		peopleDirs = os.listdir( self.__storePath )
 		for personDir in peopleDirs:
+			if self.__cancelling:
+				self.__cancelling = False
+				return
 			profileFile = "{0}/{1}/profile.json".format( self.__storePath,
 				personDir )
 			if not os.path.exists( profileFile ):
@@ -101,8 +111,8 @@ class TinderBot( object ):
 			self.__people[person["_id"]] = person
 			msg = "{0}'s profile loaded.".format( person["name"] )
 			self.__printMsg( msg )
-			msg = "{0} people loaded.".format( len( self.__people ) )
-			self.__printMsg( msg )
+		msg = "{0} people loaded.".format( len( self.__people ) )
+		self.__printMsg( msg )
 
 	def authenticate( self, token, id_ ):
 		data = json.dumps( {"facebook_token": token, "facebook_id": id_} )
@@ -207,6 +217,9 @@ class TinderBot( object ):
 		self.__printMsg( "{0} recommendations:".format(
 			len( recommendations ) ) )
 		for person in recommendations:
+			if self.__cancelling:
+				self.__cancelling = False
+				return
 			self.__updatePerson( person )
 		self.__printMsg( "{0} total people.".format(
 			len( self.__people ) ) )
@@ -216,11 +229,19 @@ class TinderBot( object ):
 			self.__printMsg( "Cannot update store: Store doesn't exist" )
 			return
 		for id_, person in self.__people.items():
+			if self.__cancelling:
+				self.__cancelling = False
+				return
 			self.__updatePerson( person )
 			
-	def __updateMatch( self, match ):
-		person = match["person"]
-		self.__updateRecommendation( person )
+	def __updateMatchedPerson( self, person, matchDir ):
+		self.__printMsg( "Updating match with {0} ...".format(
+			person["name"] ) )
+		self.__updatePerson( person )
+		self.__matchedPeople[person["_id"]] = person
+		self.__indexPerson( person, matchDir )
+		self.__printMsg( "{0}'s match updated.".format(
+			person["name"] ) )
 
 	def requestUpdates( self ):
 		data = json.dumps( {"last_activity_date": ""} )
@@ -235,14 +256,12 @@ class TinderBot( object ):
 		if not os.path.isdir( matchDir ):
 			os.makedirs( matchDir )
 		for match in self.__matches:
-			person = match["person"]
-			self.__printMsg( "Updating match with {0} ...".format(
-				person["name"] ) )
-			self.__updatePerson( person )
-			self.__matchedPeople[person["_id"]] = person
-			self.__indexPerson( person, matchDir )
-			self.__printMsg( "{0}'s match updated.".format(
-				person["name"] ) )
+			if self.__cancelling:
+				self.__cancelling = False
+				return
+			self.__updateMatchedPerson( match["person"], matchDir )
+		self.__printMsg( "{0} matches updated.".format(
+			len( self.__matches ) ) )
 		self.__blocks = responseDict["blocks"]
 
 	def like( self, id_ ):
