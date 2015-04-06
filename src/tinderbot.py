@@ -109,8 +109,7 @@ class TinderBot( object ):
 		self.__printMsg( "Saving {0}'s photos ...".format( recommendation["name"] ) )
 		for photo in recommendation["photos"]:
 			url = photo["url"]
-			photoname = url.rsplit( "/", 1 )[1]
-			photoDestination = "{0}/{1}".format( photosDir, photoname )
+			photoDestination = "{0}/{1}".format( photosDir, photo["fileName"] )
 			urllib.request.urlretrieve( url, photoDestination )
 
 	def __saveIndex( self, recommendation, indexDir, photosDir ):
@@ -119,9 +118,13 @@ class TinderBot( object ):
 			self.__printMsg( "Cannot save index for {0}: No pictures.".format(
 				recommendation["name"] ) )
 			return
-		photoname = recommendation["photos"][0]["url"].rsplit( "/", 1 )[1]
-		photoDestination = "{0}/{1}".format( photosDir, photoname )
-		_, extension = os.path.splitext( photoname )
+		for photo in recommendation["photos"][::-1]:
+			# if no valid main the first photo is used
+			if photo.get("main"):
+				# it may not have the key main
+				break
+		photoDestination = "{0}/{1}".format( photosDir, photo["fileName"] )
+		_, extension = os.path.splitext( photo["fileName"] )
 		indexLink = "{0}/{1}_{2}{3}".format( indexDir, recommendation["name"],
 			recommendation["_id"], extension )
 		if os.path.exists( indexLink ):
@@ -177,7 +180,6 @@ class TinderBot( object ):
 		self.__printMsg( "Requesting recommendations ..." )
 		response = requests.get( "{0}/user/recs".format( HOST ),
 			headers=self.__headers )
-		self.__validateResponse( response )
 		if not self.__validResponse( response ):
 			return
 		recommendations = response.json()["results"]
