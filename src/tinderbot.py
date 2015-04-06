@@ -1,8 +1,29 @@
+# -----------------------------------------------------------------------------
+#
+# Python wrapper built on top on the Tinder API.
+#
+# References:
+# https://gist.github.com/rtt/10403467
+# https://gist.github.com/rtt/5a2e0cfa638c938cca59
+#
+# To get facebook token:
+# https://www.facebook.com/dialog/oauth?client_id=464891386855067&
+# redirect_uri=https://www.facebook.com/connect/login_success.html&
+# scope=basic_info,email,public_profile,user_about_me,user_activities,
+# user_birthday,user_education_history,user_friends,user_interests,user_likes,
+# user_location,user_photos,user_relationship_details&response_type=token
+#
+# To get facebook id:
+# http://findmyfacebookid.com
+#
+#------------------------------------------------------------------------------
+
 import json
 import requests
 import datetime
 import os
 import urllib
+import sys
 
 
 BOT_NAME = "TinderBot"
@@ -29,6 +50,7 @@ class TinderBot( object ):
 		self.__recommendations = {}
 		self.__matches = {}
 		self.__blocks = {}
+		self.__remainingLikes = sys.maxsize
 
 	def __loadRecommendations( self ):
 		recommendationDirs = os.listdir( self.__storePath )
@@ -56,15 +78,20 @@ class TinderBot( object ):
 		msg = "[{0}] {1}: {2}".format( time, BOT_NAME, msg )
 		print( msg )
 
+	def __validResponse( self, response ):
+		if response.status_code != 200:
+			msg = "Error in request: {0}".format( response.status_code )
+			self.__printMsg( msg )
+			return False
+		return True
+
 	def authenticate( self, token, id_ ):
 		data = json.dumps( {"facebook_token": token, "facebook_id": id_} )
 		self.__printMsg( "Authenticating ..." )
 		response = requests.post( "{0}/auth".format( HOST ),
 			headers=self.__headers, data=data )
-		if response.status_code != 200:
+		if not self.__validResponse( response ):
 			# if 500 your facebook token might be out of date
-			msg = "Cannot authenticate!: {0}".format( response.json() )
-			self.__printMsg( msg )
 			return
 		self.__headers["X-Auth-Token"] = response.json()["token"]
 		self.__userId = response.json()["user"]["_id"]
@@ -150,10 +177,9 @@ class TinderBot( object ):
 		self.__printMsg( "Requesting recommendations ..." )
 		response = requests.get( "{0}/user/recs".format( HOST ),
 			headers=self.__headers )
-		if response.status_code != 200:
-			msg = "{0}: Error in request: {1}".format( BOTNAME,
-				response.status_code )
-			raise TinderBotException( msg )
+		self.__validateResponse( response )
+		if not self.__validResponse( response ):
+			return
 		recommendations = response.json()["results"]
 		self.__printMsg( "{0} recommendations:".format(
 			len( recommendations ) ) )
@@ -166,13 +192,26 @@ class TinderBot( object ):
 		data = json.dumps( {"last_activity_date": ""} )
 		response = requests.post( "{0}/updates".format( HOST ),
 			headers=self.__headers, data=data )
-		if response.status_code != 200:
-			msg = "{0}: Error in request: {1}".format( BOTNAME,
-				response.status_code )
-			raise TinderBotException( msg )
+		if not self.__validResponse( response ):
+			return
 		responseDict = response.json()
 		self.__matches = responseDict["matches"]
 		self.__blocks = reponseDict["blocks"]
 
-	def likeRecommendations( self ):
-		pass
+	def like( self, id_ ):
+		if id_ not in self.__recommendations:
+			self.__printMsg( "Don't know about her/him" )
+			return
+		recommendation = self.__recommendations[id_]
+		self.__printMsg( "Liking {0} ...".format( recommendation["name"] ) )
+		requestMsg = "{0}/like/{1}".format( HOST, id_ )
+		response = requests.get( requestMsg, headers=self.__headers )
+		if not self.__validResponse( response ):
+			return
+		responseDict = response.json()
+		if responseDict["match"]:
+			self.__printMsg( "You've got a MATCH with {0}!".format(
+				recommendation["name"] ) )
+		self.__remainingLikes = responseDict["likes_remaining"]
+		self.__printMsg( "{0} likes remaining.".format(
+			self.__remainingLikes ) )
