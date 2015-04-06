@@ -127,6 +127,8 @@ class TinderBot( object ):
 		self.__printMsg( "Athentication succesfully." )
 		self.__requestProfile()
 		self.__loadPeople()
+		self.updateStore()
+		self.requestUpdates()
 
 	def __saveProfile( self, person, profileDir ):
 		profileDestination = "{0}/profile.json".format( profileDir )
@@ -201,11 +203,25 @@ class TinderBot( object ):
 			else:
 				msg = "{0} is up to date in the store.".format( name )
 				self.__printMsg( msg )
+				return False
 		else:
 			self.__printMsg( "Adding {0} to the store:".format( name ) )
 			self.__savePerson( person )
 			self.__people[id_] = person
 			self.__printMsg( "{0} added.".format( name ) )
+		return True
+
+	def __updatePersons( self, persons ):
+		# Persons, although incorrect, helps to point
+		# that it's a list of people, not a dictionary
+		updatesNumber = 0
+		for person in persons:
+			if self.__cancelling:
+				self.__cancelling = False
+				return updatesNumber 
+			if self.__updatePerson( person ):
+				updatesNumber += 1
+		return updatesNumber
 				
 	def requestRecommendations( self ):
 		self.__printMsg( "Requesting recommendations ..." )
@@ -214,25 +230,17 @@ class TinderBot( object ):
 		if not self.__validResponse( response ):
 			return
 		recommendations = response.json()["results"]
-		self.__printMsg( "{0} recommendations:".format(
-			len( recommendations ) ) )
-		for person in recommendations:
-			if self.__cancelling:
-				self.__cancelling = False
-				return
-			self.__updatePerson( person )
-		self.__printMsg( "{0} total people.".format(
-			len( self.__people ) ) )
+		self.__printMsg( "{0} recommendations:".format(	len( recommendations ) ) )
+		updatesNumber = self.__updatePersons( recommendations )
+		self.__printMsg( "{0} added/updated people.".format( updatesNumber ) )
 
 	def updateStore( self ):
 		if not os.path.isdir( self.__storePath ):
 			self.__printMsg( "Cannot update store: Store doesn't exist" )
 			return
-		for id_, person in self.__people.items():
-			if self.__cancelling:
-				self.__cancelling = False
-				return
-			self.__updatePerson( person )
+		self.__printMsg( "Updating {0} people ... ".format( len( self.__people ) ) )
+		updatesNumber = self.__updatePersons( self.__people.values() )
+		self.__printMsg( "{0} people updated.".format( updatesNumber ) )
 			
 	def __updateMatchedPerson( self, person, matchDir ):
 		self.__printMsg( "Updating match with {0} ...".format(
@@ -281,3 +289,13 @@ class TinderBot( object ):
 		self.__remainingLikes = responseDict["likes_remaining"]
 		self.__printMsg( "{0} likes remaining.".format(
 			self.__remainingLikes ) )
+
+	def massiveLike( self ):
+		toLike = [id_ for id_ in self.__people if id_ not in self.__matchedPeople]
+		self.__printMsg( "Liking them all ..." )
+		for id_ in toLike:
+			if self.__cancelling:
+				self.__cancelling = False
+				return
+			self.like( id_ )
+		self.__printMsg( "{0} people liked." )
