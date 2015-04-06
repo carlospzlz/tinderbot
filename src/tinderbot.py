@@ -50,6 +50,7 @@ class TinderBot( object ):
 		self.__people = {}
 		self.__matches = []
 		self.__matchedPeople = {}
+		self.__blocks = {}
 		self.__remainingLikes = sys.maxsize
 
 	def getPeople( self ):
@@ -256,7 +257,7 @@ class TinderBot( object ):
 			return
 		responseDict = response.json()
 		if responseDict["match"]:
-			msg = "You've got a MATCH with {0}!".format( person["name"] ) )
+			msg = "You've got a MATCH with {0}!".format( person["name"] )
 			self.__printMsg( msg )
 		self.__remainingLikes = responseDict["likes_remaining"]
 		self.__printMsg( "{0} likes remaining.".format(
