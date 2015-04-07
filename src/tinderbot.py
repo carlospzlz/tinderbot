@@ -34,6 +34,7 @@ HEADERS = {
 	"platform"     : "android",
 	"user-agent"   : "Tinder/4.0.9 (iPhone; iOS 8.1.1; Scale/2.00)",
 }
+HI_MESSAGE = "Hi {0}! How are you?"
 HOST = "https://api.gotinder.com"
 STORE_BASE_PATH = "{0}/tinderStore".format( os.environ["HOME"] )
 TIME_FORMAT = "%H:%M:%S"
@@ -333,6 +334,21 @@ class TinderBot( object ):
 				return
 			self.like( id_ )
 		self.__printMsg( "{0} people liked." )
+		self.__requestUpdates()
 
-	def massiveHi( self ):
-		pass
+	def broadcastHi( self ):
+		matchesToSayHi = [match for match in self.__matches if not match["messages"]]
+		self.__printMsg( "{0} people to say hi:".format( len( matchesToSayHi ) ) )
+		for match in matchesToSayHi:
+			if self.__cancelling:
+				self.__cancelling = False
+				return
+			name = match["person"]["name"]
+			data = json.dumps( { "message": HI_MESSAGE.format( name ) } )
+			self.__printMsg( "Saying hi to {0} ...".format( name ) )
+			response = requests.post( "{0}/user/matches/{1}".format( HOST, match["_id"] ),
+				headers=self.__headers, data=data )
+			if self.__validResponse( response ):
+				self.__printMsg( "Hi sent succesfully." )
+		self.__requestUpdates()
+
