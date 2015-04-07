@@ -49,6 +49,7 @@ class TinderBot( object ):
 		self.__profile = {}
 		self.__storePath = ""
 		self.__people = {}
+		self.__likes = set()
 		self.__matches = []
 		self.__matchedPeople = {}
 		self.__blocks = {}
@@ -65,7 +66,7 @@ class TinderBot( object ):
 	def getMatchedPeople( self ):
 		return self.__matchedPeople
 
-	def __signalHandler( self, signal, frame):
+	def __signalHandler( self, signal, frame ):
 		self.__cancelling = True
 		self.__printMsg( "Cancelling ..." )
 
@@ -94,9 +95,6 @@ class TinderBot( object ):
 		self.__printMsg( "Store path set." )
 
 	def __loadPeople( self ):
-		if not os.path.isdir( self.__storePath ):
-			self.__printMsg( "Cannot load people: Store doesn't exist" )
-			return
 		peopleDirs = os.listdir( self.__storePath )
 		for personDir in peopleDirs:
 			if self.__cancelling:
@@ -106,13 +104,28 @@ class TinderBot( object ):
 				personDir )
 			if not os.path.exists( profileFile ):
 				continue
-			with open(profileFile, "r") as inFile:
+			with open( profileFile, "r" ) as inFile:
 				person = json.load( inFile )
 			self.__people[person["_id"]] = person
 			msg = "{0}'s profile loaded.".format( person["name"] )
 			self.__printMsg( msg )
 		msg = "{0} people loaded.".format( len( self.__people ) )
 		self.__printMsg( msg )
+
+	def __loadLikes( self ):
+		likesFile = "{0}/likes.json".format( self.__storePath )
+		if not os.path.exists( likesFile ):
+			self.__printMsg( "Cannot load likes! File doens't exist." )
+			return
+		with open( likesFile, "r" ) as inFile:
+			self.__likes = set( json.load( inFile ) )
+
+	def __loadData( self ):
+		if not os.path.isdir( self.__storePath ):
+			self.__printMsg( "Cannot load people: Store doesn't exist" )
+			return
+		self.__loadPeople()
+		self.__loadLikes()
 
 	def authenticate( self, token, id_ ):
 		data = json.dumps( {"facebook_token": token, "facebook_id": id_} )
@@ -126,16 +139,16 @@ class TinderBot( object ):
 		self.__userId = response.json()["user"]["_id"]
 		self.__printMsg( "Athentication succesfully." )
 		self.__requestProfile()
-		self.__loadPeople()
+		self.__loadData()
 		self.updateStore()
 		self.requestUpdates()
 
 	def __saveProfile( self, person, profileDir ):
 		profileDestination = "{0}/profile.json".format( profileDir )
 		self.__printMsg( "Saving {0}'s profile ...".format( person["name"] ) )
-		with open(profileDestination, "w") as outFile:
-			json.dump( person, outFile )
-	
+		with open( profileDestination, "w" ) as outFile:
+			json.dump( person, outFile, indent=4, sort_keys=True )
+
 	def __savePhotos( self, person, photosDir ):
 		self.__printMsg( "Saving {0}'s photos ...".format( person["name"] ) )
 		for photo in person["photos"]:
@@ -145,14 +158,14 @@ class TinderBot( object ):
 
 	def __indexPerson( self, person, indexDir ):
 		self.__printMsg( "Indexing {0} in {1} ...".format(
-			person["name"], indexDir.rsplit("/",1)[1] ) )
+			person["name"], indexDir.rsplit( "/", 1 )[1] ) )
 		if not person["photos"]:
 			self.__printMsg( "Cannot index {0}: No pictures.".format(
 				person["name"] ) )
 			return
 		for photo in person["photos"][::-1]:
 			# if no valid main the first photo is used
-			if photo.get("main"):
+			if photo.get( "main" ):
 				# it may not have the key main
 				break
 		photoDestination = "{0}/{1}_{2}/photos/{3}".format(
@@ -182,12 +195,15 @@ class TinderBot( object ):
 		if not os.path.isdir( indexDir ):
 			os.makedirs( indexDir )
 		self.__indexPerson( person, indexDir )
-	
+
 	def __getPingTime( self, person ):
-		pingTimeString = person["ping_time"].split( ".", 1)[0]
+		pingTimeString = person["ping_time"].split( ".", 1 )[0]
 		pingTime = datetime.datetime.strptime( pingTimeString,
 			"%Y-%m-%dT%H:%M:%S" )
 		return pingTime
+
+	def __runOutOfLikes( self, id_ ):
+		False
 
 	def __updatePerson( self, person ):
 		id_ = person["_id"]
@@ -218,11 +234,11 @@ class TinderBot( object ):
 		for person in persons:
 			if self.__cancelling:
 				self.__cancelling = False
-				return updatesNumber 
+				return updatesNumber
 			if self.__updatePerson( person ):
 				updatesNumber += 1
 		return updatesNumber
-				
+
 	def requestRecommendations( self ):
 		self.__printMsg( "Requesting recommendations ..." )
 		response = requests.get( "{0}/user/recs".format( HOST ),
@@ -230,7 +246,10 @@ class TinderBot( object ):
 		if not self.__validResponse( response ):
 			return
 		recommendations = response.json()["results"]
-		self.__printMsg( "{0} recommendations:".format(	len( recommendations ) ) )
+		if recommendations[0]["name"] == "Tinder Team":
+			self.__printMsg( "You run out of likes :_( " )
+			return
+		self.__printMsg( "{0} recommendations:".format( len( recommendations ) ) )
 		updatesNumber = self.__updatePersons( recommendations )
 		self.__printMsg( "{0} added/updated people.".format( updatesNumber ) )
 
@@ -241,17 +260,19 @@ class TinderBot( object ):
 		self.__printMsg( "Updating {0} people ... ".format( len( self.__people ) ) )
 		updatesNumber = self.__updatePersons( self.__people.values() )
 		self.__printMsg( "{0} people updated.".format( updatesNumber ) )
-			
+
 	def __updateMatchedPerson( self, person, matchDir ):
 		self.__printMsg( "Updating match with {0} ...".format(
 			person["name"] ) )
 		self.__updatePerson( person )
 		self.__matchedPeople[person["_id"]] = person
 		self.__indexPerson( person, matchDir )
+		self.__likes
 		self.__printMsg( "{0}'s match updated.".format(
 			person["name"] ) )
 
 	def requestUpdates( self ):
+		self.__printMsg( "Requesting updates ..." )
 		data = json.dumps( {"last_activity_date": ""} )
 		response = requests.post( "{0}/updates".format( HOST ),
 			headers=self.__headers, data=data )
@@ -272,7 +293,15 @@ class TinderBot( object ):
 			len( self.__matches ) ) )
 		self.__blocks = responseDict["blocks"]
 
+	def __saveLikes( self ):
+		likesDestination = "{0}/likes.json".format( self.__storePath )
+		self.__printMsg( "Saving your likes ..." )
+		with open( likesDestination, "w" ) as outFile:
+			json.dump( list( self.__likes ), outFile, indent=4, sort_keys=True )
+
 	def like( self, id_ ):
+		# Liking more than once the same
+		# person decreases number of likes.
 		if id_ not in self.__people:
 			self.__printMsg( "Don't know about her/him" )
 			return
@@ -283,6 +312,11 @@ class TinderBot( object ):
 		if not self.__validResponse( response ):
 			return
 		responseDict = response.json()
+		if "rate_limited_until" in responseDict:
+			self.__printMsg( "You run out of likes :_( " )
+			return
+		self.__likes.add( id_ )
+		self.__saveLikes()
 		if responseDict["match"]:
 			msg = "You've got a MATCH with {0}!".format( person["name"] )
 			self.__printMsg( msg )
@@ -291,7 +325,7 @@ class TinderBot( object ):
 			self.__remainingLikes ) )
 
 	def massiveLike( self ):
-		toLike = [id_ for id_ in self.__people if id_ not in self.__matchedPeople]
+		toLike = [id_ for id_ in self.__people if id_ not in self.__likes]
 		self.__printMsg( "Liking them all ..." )
 		for id_ in toLike:
 			if self.__cancelling:
@@ -299,3 +333,6 @@ class TinderBot( object ):
 				return
 			self.like( id_ )
 		self.__printMsg( "{0} people liked." )
+
+	def massiveHi( self ):
+		pass
