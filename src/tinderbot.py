@@ -136,7 +136,7 @@ class TinderBot( object ):
 		if not self.__validResponse( response ):
 			# if 500 your facebook token might be out of date
 			return
-		self.__headers["X-Auth-Token"] = response.json()["token"]
+		self.__headers["x-auth-token"] = response.json()["token"]
 		self.__userId = response.json()["user"]["_id"]
 		self.__printMsg( "Successful authentication." )
 		self.__requestProfile()
