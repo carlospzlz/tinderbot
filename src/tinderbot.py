@@ -138,7 +138,7 @@ class TinderBot( object ):
 			return
 		self.__headers["X-Auth-Token"] = response.json()["token"]
 		self.__userId = response.json()["user"]["_id"]
-		self.__printMsg( "Athentication succesfully." )
+		self.__printMsg( "Succesful authentication." )
 		self.__requestProfile()
 		self.__loadData()
 		self.updateStore()
