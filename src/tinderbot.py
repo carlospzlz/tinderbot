@@ -46,7 +46,7 @@ class TinderBotException( Exception ):
 
 class TinderBot( object ):
 	def __init__( self ):
-		self.__headers = HEADERS
+		self.__headers = dict( HEADERS )
 		self.__profile = {}
 		self.__storePath = ""
 		self.__people = {}
