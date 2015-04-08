@@ -203,9 +203,6 @@ class TinderBot( object ):
 			"%Y-%m-%dT%H:%M:%S" )
 		return pingTime
 
-	def __runOutOfLikes( self, id_ ):
-		False
-
 	def __updatePerson( self, person ):
 		id_ = person["_id"]
 		name = person["name"]
