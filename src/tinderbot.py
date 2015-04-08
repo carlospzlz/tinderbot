@@ -348,4 +348,3 @@ class TinderBot( object ):
 			if self.__validResponse( response ):
 				self.__printMsg( "Hi sent succesfully." )
 		self.__requestUpdates()
-
