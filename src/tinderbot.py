@@ -331,7 +331,7 @@ class TinderBot( object ):
 				return
 			self.like( id_ )
 		self.__printMsg( "{0} people liked." )
-		self.__requestUpdates()
+		self.requestUpdates()
 
 	def broadcastHi( self ):
 		matchesToSayHi = [match for match in self.__matches if not match["messages"]]
@@ -347,4 +347,4 @@ class TinderBot( object ):
 				headers=self.__headers, data=data )
 			if self.__validResponse( response ):
 				self.__printMsg( "Hi sent succesfully." )
-		self.__requestUpdates()
+		self.requestUpdates()
