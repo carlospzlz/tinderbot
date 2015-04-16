@@ -141,7 +141,6 @@ class TinderBot( object ):
 		self.__printMsg( "Successful authentication." )
 		self.__requestProfile()
 		self.__loadData()
-		self.updateStore()
 		self.requestUpdates()
 
 	def __saveProfile( self, person, profileDir ):
@@ -255,9 +254,26 @@ class TinderBot( object ):
 		if not os.path.isdir( self.__storePath ):
 			self.__printMsg( "Cannot update store: Store doesn't exist" )
 			return
-		self.__printMsg( "Updating {0} people ... ".format( len( self.__people ) ) )
-		updatesNumber = self.__updatePersons( self.__people.values() )
-		self.__printMsg( "{0} people updated.".format( updatesNumber ) )
+		self.__printMsg( "Requesting users' profiles from server ..." )
+		totalPeople = len( self.__people )
+		checkCounter = 0
+		updateCounter = 0
+		for person in self.__people.values():
+			if self.__cancelling:
+				self.__cancelling = False
+				return
+			self.__printMsg( "Requesting {0}'s profile ...".format( person["name"] ) )
+			response = requests.get( "{0}/user/{1}".format( HOST, person["_id"] ),
+				headers=self.__headers )
+			if not self.__validResponse( response ):
+				continue
+			self.__printMsg( "Updating {0} ... ".format( person["name"] ) )
+			updateCounter += self.__updatePerson( response.json()["results"] )
+			percentage = "{0} %".format( int( checkCounter/float( totalPeople ) * 100 ) )
+			self.__printMsg( percentage )
+			checkCounter += 1
+		self.__printMsg( "{0} people updated.".format( updateCounter ) )
+		self.__printMsg( "Store is up to date." )
 
 	def __updateMatchedPerson( self, person, matchDir ):
 		self.__printMsg( "Updating match with {0} ...".format(
