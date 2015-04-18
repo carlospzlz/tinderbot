@@ -276,14 +276,10 @@ class TinderBot( object ):
 		self.__printMsg( "Store is up to date." )
 
 	def __updateMatchedPerson( self, person, matchDir ):
-		self.__printMsg( "Updating match with {0} ...".format(
-			person["name"] ) )
+		self.__printMsg( "Updating match with {0} ...".format( person["name"] ) )
 		self.__updatePerson( person )
-		self.__matchedPeople[person["_id"]] = person
 		self.__indexPerson( person, matchDir )
-		self.__likes
-		self.__printMsg( "{0}'s match updated.".format(
-			person["name"] ) )
+		self.__printMsg( "{0}'s match updated.".format( person["name"] ) )
 
 	def requestUpdates( self ):
 		self.__printMsg( "Requesting updates ..." )
@@ -294,6 +290,11 @@ class TinderBot( object ):
 			return
 		responseDict = response.json()
 		self.__matches = responseDict["matches"]
+		self.__blocks = responseDict["blocks"]
+		self.__printMsg( "You've got {0} matches.".format( len( self.__matches ) ) )
+		self.__printMsg( "{0} updated.".format(	BOT_NAME ) )
+
+	def updateMatches( self ):
 		self.__printMsg( "Updating matches ..." )
 		matchDir = "{0}/matches".format( self.__storePath )
 		if not os.path.isdir( matchDir ):
@@ -303,9 +304,8 @@ class TinderBot( object ):
 				self.__cancelling = False
 				return
 			self.__updateMatchedPerson( match["person"], matchDir )
-		self.__printMsg( "{0} matches updated.".format(
+		self.__printMsg( "{0} matches updated in the store.".format(
 			len( self.__matches ) ) )
-		self.__blocks = responseDict["blocks"]
 
 	def __saveLikes( self ):
 		likesDestination = "{0}/likes.json".format( self.__storePath )
@@ -324,29 +324,32 @@ class TinderBot( object ):
 		requestMsg = "{0}/like/{1}".format( HOST, id_ )
 		response = requests.get( requestMsg, headers=self.__headers )
 		if not self.__validResponse( response ):
-			return
+			return False
 		responseDict = response.json()
 		if "rate_limited_until" in responseDict:
 			self.__printMsg( "You run out of likes :_( " )
-			return
+			return False
 		self.__likes.add( id_ )
 		self.__saveLikes()
 		if responseDict["match"]:
+			self.__matchedPeople[person["_id"]] = person
 			msg = "You've got a MATCH with {0}!".format( person["name"] )
 			self.__printMsg( msg )
 		self.__remainingLikes = responseDict["likes_remaining"]
 		self.__printMsg( "{0} likes remaining.".format(
 			self.__remainingLikes ) )
+		return True
 
 	def massiveLike( self ):
 		toLike = [id_ for id_ in self.__people if id_ not in self.__likes]
 		self.__printMsg( "Liking them all ..." )
+		likeCounter = 0
 		for id_ in toLike:
 			if self.__cancelling:
 				self.__cancelling = False
-				return
-			self.like( id_ )
-		self.__printMsg( "{0} people liked." )
+				break
+			likeCounter += self.like( id_ )
+		self.__printMsg( "{0} people liked.".format( likeCounter ) )
 		self.requestUpdates()
 
 	def broadcastHi( self ):
