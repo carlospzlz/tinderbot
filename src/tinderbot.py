@@ -153,8 +153,12 @@ class TinderBot( object ):
 		self.__printMsg( "Saving {0}'s photos ...".format( person["name"] ) )
 		for photo in person["photos"]:
 			url = photo["url"]
-			photoDestination = "{0}/{1}".format( photosDir, photo["fileName"] )
-			urllib.request.urlretrieve( url, photoDestination )
+			fileName = os.path.basename(url)
+			photoDestination = "{0}/{1}".format( photosDir, fileName )
+			try:
+				urllib.request.urlretrieve( url, photoDestination )
+			except urllib.error.HTTPError as e:
+				self.__printMsg( "Cannot get {0}! {1}".format( url, e ) )
 
 	def __indexPerson( self, person, indexDir ):
 		self.__printMsg( "Indexing {0} in {1} ...".format(
@@ -168,9 +172,10 @@ class TinderBot( object ):
 			if photo.get( "main" ):
 				# it may not have the key main
 				break
+		fileName = os.path.basename(photo["url"])
 		photoDestination = "{0}/{1}_{2}/photos/{3}".format(
-			self.__storePath, person["name"], person["_id"], photo["fileName"] )
-		_, extension = os.path.splitext( photo["fileName"] )
+			self.__storePath, person["name"], person["_id"], fileName )
+		_, extension = os.path.splitext( fileName )
 		indexLink = "{0}/{1}_{2}{3}".format( indexDir, person["name"],
 			person["_id"], extension )
 		if os.path.exists( indexLink ):
